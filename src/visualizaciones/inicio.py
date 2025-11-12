@@ -5,6 +5,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 
+
 PROMPT_COLOR_MAP = {
     "On Tragedy":                "#0072B2",
     "Egyptian Social Structure": "#E69F00",
@@ -75,10 +76,7 @@ def _scatter_with_trend(df, color_by, color_map):
 
 # Histograma en densidad con curva KDE
 def _hist_density(series, title, bar_color, line_color):
-    import plotly.express as px
-    import plotly.graph_objects as go
-    import numpy as np
-
+    
     fig = px.histogram(
         x=series.dropna(),
         nbins=40,
