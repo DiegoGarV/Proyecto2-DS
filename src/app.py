@@ -1,4 +1,3 @@
-# BLOQUE — src/app.py
 import sys
 from pathlib import Path
 import importlib
