@@ -27,7 +27,7 @@ PAGES = {
     "Prompts": "visualizaciones.prompts",
     "Longitud y estructura": "visualizaciones.long_estruct",
     "Explicabilidad": "visualizaciones.explicabilidad",
-    "Comparador de modelos": "visualizaciones.modelos",
+    "Resultados de modelos": "visualizaciones.modelos",
     "Predicción interactiva": "visualizaciones.prediccion",
     "Auditoría": "visualizaciones.auditoria",
     "Ejemplos": "visualizaciones.ejemplos",
