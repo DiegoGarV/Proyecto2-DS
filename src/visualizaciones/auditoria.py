@@ -58,7 +58,7 @@ def render(st):
         df,
         x="n_words",
         y="content",
-        color=PROMPT_COLOR_MAP,
+        color_discrete_map=PROMPT_COLOR_MAP,
         opacity=0.6,
         labels={
             "n_words": "Longitud (número de palabras)",
@@ -88,7 +88,7 @@ def render(st):
         df,
         x="n_words",
         y="wording",
-        color=PROMPT_COLOR_MAP,
+        color_discrete_map=PROMPT_COLOR_MAP,
         opacity=0.6,
         labels={
             "n_words": "Longitud (número de palabras)",
