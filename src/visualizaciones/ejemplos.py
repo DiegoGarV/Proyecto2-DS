@@ -2,8 +2,20 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import plotly.express as px
+
+PROMPT_COLOR_MAP = {
+    "On Tragedy": "#0072B2",
+    "Egyptian Social Structure": "#E69F00",
+    "The Third Wave": "#009E73",
+    "Excerpt from The Jungle": "#D55E00",
+}
+DIST_COLOR_CONTENT = "#56B4E9"
+DIST_COLOR_WORDING = "#CC79A7"
+LINE_COLOR = "#F0E442"
 
 DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "Data_merged.csv"
+
 
 @st.cache_data
 def load_data():
@@ -13,9 +25,12 @@ def load_data():
     df["promedio"] = df[["content", "wording"]].mean(axis=1)
     return df
 
+
 def render(st):
     st.title("Galería de Ejemplos")
-    st.caption("Explora ejemplos representativos de resúmenes según sus calificaciones.")
+    st.caption(
+        "Explora ejemplos representativos de resúmenes según sus calificaciones."
+    )
 
     try:
         df = load_data()
@@ -32,21 +47,29 @@ def render(st):
 
     st.sidebar.markdown("### Rango de calificaciones")
     c_min, c_max = st.sidebar.slider(
-        "Content", float(df["content"].min()), float(df["content"].max()),
-        (float(df["content"].quantile(0.25)), float(df["content"].quantile(0.75)))
+        "Content",
+        float(df["content"].min()),
+        float(df["content"].max()),
+        (float(df["content"].quantile(0.25)), float(df["content"].quantile(0.75))),
     )
     w_min, w_max = st.sidebar.slider(
-        "Wording", float(df["wording"].min()), float(df["wording"].max()),
-        (float(df["wording"].quantile(0.25)), float(df["wording"].quantile(0.75)))
+        "Wording",
+        float(df["wording"].min()),
+        float(df["wording"].max()),
+        (float(df["wording"].quantile(0.25)), float(df["wording"].quantile(0.75))),
     )
 
-    filtered = df[(df["content"].between(c_min, c_max)) & (df["wording"].between(w_min, w_max))]
+    filtered = df[
+        (df["content"].between(c_min, c_max)) & (df["wording"].between(w_min, w_max))
+    ]
 
     st.divider()
     st.subheader("Tabla de ejemplos filtrados")
     st.dataframe(
-        filtered[["prompt_title", "content", "wording", "n_words"]].sort_values("content", ascending=False).head(50),
-        use_container_width=True
+        filtered[["prompt_title", "content", "wording", "n_words"]]
+        .sort_values("content", ascending=False)
+        .head(50),
+        use_container_width=True,
     )
 
     st.divider()
@@ -56,7 +79,9 @@ def render(st):
         # ejemplo más cercano al promedio
         target_c = filtered["content"].median()
         target_w = filtered["wording"].median()
-        filtered["dist"] = np.abs(filtered["content"] - target_c) + np.abs(filtered["wording"] - target_w)
+        filtered["dist"] = np.abs(filtered["content"] - target_c) + np.abs(
+            filtered["wording"] - target_w
+        )
         example = filtered.sort_values("dist").iloc[0]
 
         st.metric("Prompt", example["prompt_title"])
@@ -71,5 +96,27 @@ def render(st):
         st.warning("No hay ejemplos en el rango seleccionado.")
 
     st.divider()
+
     st.subheader("Distribución de calificaciones (vista rápida)")
-    st.bar_chart(df[["content", "wording"]])
+
+    df_melt = df.melt(
+        value_vars=["content", "wording"], var_name="metric", value_name="score"
+    )
+
+    fig = px.histogram(
+        df_melt,
+        x="score",
+        color="metric",
+        barmode="overlay",
+        opacity=0.6,
+        color_discrete_map={
+            "content": DIST_COLOR_CONTENT,
+            "wording": DIST_COLOR_WORDING,
+        },
+        labels={"score": "Calificación", "metric": "Métrica"},
+        title="Distribución de Content y Wording",
+    )
+
+    fig.update_layout(showlegend=True, bargap=0.1)
+
+    st.plotly_chart(fig, use_container_width=True)
