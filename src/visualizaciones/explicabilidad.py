@@ -152,7 +152,7 @@ def render(st):
         df_key = f"global::{len(df_sub)}"
 
     # Entrenar/recuperar modelos cacheados
-    with st.spinner("Entrenando/recuperando modelos…"):
+    with st.spinner("Cargando modelos…"):
         vectorizer, models = _get_cached_models(df_key, df_sub[[TEXT_COL] + TARGETS])
 
     # Panel: Top tokens por metrica (±)
