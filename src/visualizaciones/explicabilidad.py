@@ -181,7 +181,11 @@ def render(st):
             ],
         )
         figA_pos.update_layout(xaxis={"categoryorder": "total descending"})
-        st.plotly_chart(figA_pos, use_container_width=True)
+        st.plotly_chart(
+            figA_pos,
+            use_container_width=True,
+            key=f"figA_pos_{target_a}",
+        )
 
         st.markdown(f"**Top –{target_a}**")
         st.dataframe(topA_neg, use_container_width=True, hide_index=True)
@@ -197,7 +201,11 @@ def render(st):
             ],
         )
         figA_neg.update_layout(xaxis={"categoryorder": "total ascending"})
-        st.plotly_chart(figA_neg, use_container_width=True)
+        st.plotly_chart(
+            figA_neg,
+            use_container_width=True,
+            key=f"figA_neg_{target_a}",
+        )
 
         st.caption(f"R² (in-sample) {target_a}: {models[target_a]['r2_in_sample']:.3f}")
 
@@ -221,7 +229,11 @@ def render(st):
             ],
         )
         figB_pos.update_layout(xaxis={"categoryorder": "total descending"})
-        st.plotly_chart(figB_pos, use_container_width=True)
+        st.plotly_chart(
+            figB_pos,
+            use_container_width=True,
+            key=f"figB_pos_{target_b}",
+        )
 
         st.markdown(f"**Top –{target_b}**")
         st.dataframe(topB_neg, use_container_width=True, hide_index=True)
@@ -237,7 +249,11 @@ def render(st):
             ],
         )
         figB_neg.update_layout(xaxis={"categoryorder": "total ascending"})
-        st.plotly_chart(figB_neg, use_container_width=True)
+        st.plotly_chart(
+            figB_neg,
+            use_container_width=True,
+            key=f"figB_neg_{target_b}",
+        )
 
         st.caption(f"R² (in-sample) {target_b}: {models[target_b]['r2_in_sample']:.3f}")
 
