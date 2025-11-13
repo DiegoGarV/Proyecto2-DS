@@ -5,8 +5,8 @@ import importlib
 import streamlit as st
 
 # --- Rutas robustas (independientes del working dir) ---
-APP_DIR = Path(__file__).resolve().parent          # .../src
-ROOT    = APP_DIR.parent                           # proyecto
+APP_DIR = Path(__file__).resolve().parent  # .../src
+ROOT = APP_DIR.parent  # proyecto
 VIS_DIR = APP_DIR / "visualizaciones"
 
 # Asegurar que src esté en sys.path para poder importar visualizaciones.*
