@@ -4,9 +4,7 @@ import numpy as np
 from pathlib import Path
 from collections import Counter
 import plotly.express as px
-
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import Ridge
+import joblib
 from sklearn.metrics import r2_score
 
 DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "Data_merged.csv"
@@ -49,39 +47,6 @@ def _get_prompts(df: pd.DataFrame):
     return opts
 
 
-# ---------- Modelado ligero y cache ----------
-def _make_vectorizer():
-    return TfidfVectorizer(
-        ngram_range=(1, 2),
-        min_df=3,
-        max_df=0.9,
-        strip_accents="unicode",
-        lowercase=True,
-    )
-
-
-def _fit_models(df: pd.DataFrame):
-    # Crea un vectorizador y dos modelos Ridge (uno para cada target)
-    vec = _make_vectorizer()
-    X = vec.fit_transform(df[TEXT_COL])
-
-    models = {}
-    for tgt in TARGETS:
-        y = df[tgt].astype(float)
-        m = Ridge(alpha=1.0, random_state=42)
-        m.fit(X, y)
-        yhat = m.predict(X)
-        models[tgt] = {"model": m, "r2_in_sample": float(r2_score(y, yhat))}
-    return vec, models
-
-
-@st.cache_resource(show_spinner=False)
-def _get_cached_models(df_key: str, data_for_models: pd.DataFrame):
-    # df_key debe cambiar cuando se filtra por prompt
-    vec, models = _fit_models(data_for_models)
-    return vec, models
-
-
 # ---------- Utilidades de inspeccion ----------
 def _top_coefficients(vectorizer, model, k=20):
     feature_names = np.array(vectorizer.get_feature_names_out())
@@ -97,34 +62,9 @@ def _top_coefficients(vectorizer, model, k=20):
     return top_pos, top_neg
 
 
-def _explain_text(vectorizer, model, text: str, k=20):
-    # tokens en el texto intersectados con features del vectorizador y ordenados por |peso|
-    if not text:
-        return pd.DataFrame(columns=["token", "weight", "present"])
-    feats = set(vectorizer.get_feature_names_out())
-    # tokenizacion simple alineada con TfidfVectorizer(lowercase/strip)
-    words = [w.strip(".,!?;:()[]{}\"'").lower() for w in text.split()]
-    # tambien generamos bigrams simples
-    bigrams = [f"{a} {b}" for a, b in zip(words, words[1:])]
-    tokens_text = Counter([w for w in words + bigrams if w in feats])
-
-    # pesos del modelo
-    coefs = dict(zip(vectorizer.get_feature_names_out(), model.coef_.ravel()))
-    rows = [
-        {"token": t, "weight": coefs.get(t, 0.0), "freq": c}
-        for t, c in tokens_text.items()
-    ]
-    df = (
-        pd.DataFrame(rows)
-        .sort_values(by=["weight", "freq"], ascending=[False, False])
-        .head(k)
-    )
-    return df
-
-
 # ---------- Vista principal ----------
 def render(st):
-    st.title("Explicabilidad (ligera)")
+    st.title("Explicabilidad")
     st.caption(
         "Inspeccion de tokens mas influyentes (TF-IDF + Ridge). Puedes filtrar por prompt o usar el modelo global."
     )
@@ -154,9 +94,53 @@ def render(st):
         df_sub = df
         df_key = f"global::{len(df_sub)}"
 
-    # Entrenar/recuperar modelos cacheados
-    with st.spinner("Entrenando/recuperando modelos…"):
-        vectorizer, models = _get_cached_models(df_key, df_sub[[TEXT_COL] + TARGETS])
+    # Cargar modelo/vectorizador ya entrenados y construir estructura 'models'
+    with st.spinner("Cargando modelo entrenado…"):
+        model = joblib.load("src/modelo_resumen.pkl")
+        vectorizer = joblib.load("src/vectorizer_resumen.pkl")
+
+        X_sub = vectorizer.transform(df_sub[TEXT_COL])
+        y_sub = df_sub[TARGETS].values
+
+        try:
+            y_pred = model.predict(X_sub)
+        except Exception:
+            y_pred = None
+
+        coefs = getattr(model, "coef_", None)
+        models = {}
+
+        if coefs is not None:
+            coefs = np.array(coefs)
+
+            if coefs.ndim == 2 and coefs.shape[0] >= len(TARGETS):
+                for i, tgt in enumerate(TARGETS):
+
+                    class ModelWrapper:
+                        def __init__(self, coef_row):
+                            self.coef_ = np.array(coef_row)
+
+                    mwrap = ModelWrapper(coefs[i])
+                    r2_val = (
+                        float(r2_score(y_sub[:, i], y_pred[:, i]))
+                        if (y_pred is not None and np.ndim(y_pred) == 2)
+                        else np.nan
+                    )
+                    models[tgt] = {"model": mwrap, "r2_in_sample": r2_val}
+
+            elif coefs.ndim == 1:
+
+                class ModelWrapper:
+                    def __init__(self, coef_vec):
+                        self.coef_ = np.array(coef_vec)
+
+                for tgt in TARGETS:
+                    models[tgt] = {"model": ModelWrapper(coefs), "r2_in_sample": np.nan}
+        else:
+            st.error(
+                "El modelo cargado no tiene atributo 'coef_'. No puedo calcular importancias de tokens."
+            )
+            return
 
     # Panel: Top tokens por metrica (±)
     st.subheader("Tokens mas influyentes por metrica")
@@ -278,57 +262,3 @@ def render(st):
             )
         else:
             st.warning("Ese token no esta en el vocabulario del vectorizador actual.")
-
-    st.divider()
-
-    # Explicar una prediccion concreta
-    st.subheader("Explain esta prediccion")
-    colL, colR = st.columns([1.4, 1])
-    with colL:
-        text = st.text_area("Pega aqui el texto a explicar", height=200)
-        btn = st.button("Predecir y explicar")
-    with colR:
-        # Percentiles de longitud para el contexto (global o prompt)
-        lengths = df_sub[TEXT_COL].fillna("").map(lambda s: len(str(s).split()))
-        p25, p50, p75 = (
-            np.percentile(lengths, [25, 50, 75])
-            if len(lengths)
-            else (np.nan, np.nan, np.nan)
-        )
-        st.metric("P25 palabras", f"{p25:.0f}" if p25 == p25 else "—")
-        st.metric("P50 palabras", f"{p50:.0f}" if p50 == p50 else "—")
-        st.metric("P75 palabras", f"{p75:.0f}" if p75 == p75 else "—")
-
-    if btn and text.strip():
-        Xa = vectorizer.transform([text])
-        preds = {t: float(models[t]["model"].predict(Xa)[0]) for t in TARGETS}
-        st.success("Prediccion generada")
-        m1, m2 = st.columns(2)
-        m1.metric("Content (predicho)", f"{preds['content']:.3f}")
-        m2.metric("Wording (predicho)", f"{preds['wording']:.3f}")
-
-        # Tokens del texto mas influyentes
-        st.markdown(
-            "**Tokens mas influyentes en este texto (por peso absoluto, metrica seleccionada arriba)**"
-        )
-        which = st.radio(
-            "Ver influencia para", TARGETS, horizontal=True, index=0, key="whichTgt"
-        )
-        expl = _explain_text(vectorizer, models[which]["model"], text, k=25)
-        if len(expl) == 0:
-            st.info("No se encontraron tokens del texto en el vocabulario del modelo.")
-        else:
-            expl["|weight|"] = expl["weight"].abs()
-            st.dataframe(
-                expl.sort_values("|weight|", ascending=False)[
-                    ["token", "weight", "freq"]
-                ],
-                use_container_width=True,
-                hide_index=True,
-            )
-
-        # Metricas de longitud frente a percentiles
-        n_words = len(text.split())
-        st.caption(
-            f"Longitud del texto: **{n_words}** palabras (vs. P50={p50:.0f} en el contexto seleccionado)."
-        )
