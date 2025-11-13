@@ -125,9 +125,6 @@ def _explain_text(vectorizer, model, text: str, k=20):
 # ---------- Vista principal ----------
 def render(st):
     st.title("Explicabilidad")
-    st.caption(
-        "Inspeccion de tokens mas influyentes (TF-IDF + Ridge). Puedes filtrar por prompt o usar el modelo global."
-    )
 
     # Carga de datos
     if not DATA_PATH.exists():
