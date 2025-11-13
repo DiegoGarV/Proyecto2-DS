@@ -1,78 +1,68 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
 
 def render(st):
-    st.title("📊 Resultados de Modelos y Complejidades")
-    st.write("Visualización de cómo las características del resumen (longitud y complejidad) influyen en las calificaciones promedio.")
+    # Definir paleta de colores
+    PROMPT_COLOR_MAP = {
+        "On Tragedy":                "#0072B2",
+        "Egyptian Social Structure": "#E69F00",
+        "The Third Wave":            "#009E73",
+        "Excerpt from The Jungle":   "#D55E00",
+    }
+    DIST_COLOR_CONTENT = "#56B4E9"
+    DIST_COLOR_WORDING = "#CC79A7"
+    LINE_COLOR = "#F0E442"
+    
+    st.title("Resultados de modelos")
 
-    # === Cargar datos ===
     df = pd.read_csv("visualizaciones/analisis_resumenes.csv")
 
-    # Asegurar tipos numéricos
-    numeric_cols = [
-        "len_mid",
-        "syntactic_complexity",
-        "semantic_complexity",
-        "content_by_len",
-        "wording_by_len"
-    ]
-    for col in numeric_cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+    df["len_mid"] = pd.to_numeric(df["len_mid"], errors="coerce")
 
-    # === Seleccionar característica a analizar ===
-    caracteristicas = {
-        "Longitud del resumen": "len_mid",
-        "Complejidad sintáctica": "syntactic_complexity",
-        "Complejidad semántica": "semantic_complexity"
-    }
+    st.header("Análisis de Métricas de Calidad")
+    
+    st.subheader("Relación entre la longitud del resumen y las calificaciones promedio")
 
-    selected_feature_label = st.selectbox(
-        "Selecciona la característica a analizar:",
-        list(caracteristicas.keys())
-    )
-    selected_feature = caracteristicas[selected_feature_label]
-
-    # === Seleccionar métricas a mostrar ===
-    metricas = []
-    if "content_by_len" in df.columns:
-        metricas.append("content_by_len")
-    if "wording_by_len" in df.columns:
-        metricas.append("wording_by_len")
-
+    metricas = ["content", "wording"]
     selected_metrics = st.multiselect(
         "Selecciona las métricas a mostrar:",
         metricas,
-        default=metricas
+        default=metricas,
+        key="metrics_1"
     )
 
-    # === Slider para filtrar rango de la característica ===
-    min_val, max_val = float(df[selected_feature].min()), float(df[selected_feature].max())
-    rango = st.slider(
-        f"Selecciona el rango para {selected_feature_label.lower()}",
-        float(min_val),
-        float(max_val),
-        (float(min_val), float(max_val))
+    min_len, max_len = st.slider(
+        "Selecciona el rango de longitud (número de palabras)",
+        int(df["len_mid"].min()),
+        int(df["len_mid"].max()),
+        (int(df["len_mid"].min()), int(df["len_mid"].max())),
+        key="slider_1"
     )
 
-    # Filtrar por rango
-    filtered_df = df[
-        (df[selected_feature] >= rango[0]) & (df[selected_feature] <= rango[1])
-    ]
+    filtered_df = df[(df["len_mid"] >= min_len) & (df["len_mid"] <= max_len)]
 
-    # === Graficar ===
+    # Crear color map para las métricas seleccionadas
+    color_map = {
+        "content": DIST_COLOR_CONTENT,
+        "wording": DIST_COLOR_WORDING
+    }
+    
     fig = px.line(
         filtered_df,
-        x=selected_feature,
+        x="len_mid",
         y=selected_metrics,
         markers=True,
         labels={
-            selected_feature: selected_feature_label,
+            "len_mid": "Número de palabras en el resumen",
             "value": "Promedio de calificación",
             "variable": "Métrica"
         },
-        title=f"Relación entre {selected_feature_label.lower()} y las calificaciones promedio"
+        title="Relación entre la longitud del resumen y las calificaciones promedio",
+        color_discrete_map=color_map
     )
 
     fig.update_layout(
@@ -82,4 +72,79 @@ def render(st):
 
     st.plotly_chart(fig, use_container_width=True)
 
+    st.header("Otras métricas de análisis")
+    
+    fig_all = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=("Content", "Wording", "Syntactic Complexity", "Semantic Complexity"),
+        vertical_spacing=0.20,
+        horizontal_spacing=0.1
+    )
+
+    # Content
+    fig_all.add_trace(
+        go.Scatter(x=filtered_df["len_mid"], y=filtered_df["content"], 
+                   mode='lines+markers', name='Content', 
+                   line=dict(color=DIST_COLOR_CONTENT),
+                   marker=dict(color=DIST_COLOR_CONTENT)),
+        row=1, col=1
+    )
+
+    # Wording
+    fig_all.add_trace(
+        go.Scatter(x=filtered_df["len_mid"], y=filtered_df["wording"], 
+                   mode='lines+markers', name='Wording', 
+                   line=dict(color=DIST_COLOR_WORDING),
+                   marker=dict(color=DIST_COLOR_WORDING)),
+        row=1, col=2
+    )
+
+    # Syntactic Complexity
+    fig_all.add_trace(
+        go.Scatter(x=filtered_df["len_mid"], y=filtered_df["syntactic_complexity"], 
+                   mode='lines+markers', name='Syntactic', 
+                   line=dict(color='#009E73'),
+                   marker=dict(color='#009E73')),
+        row=2, col=1
+    )
+
+    # Semantic Complexity
+    fig_all.add_trace(
+        go.Scatter(x=filtered_df["len_mid"], y=filtered_df["semantic_complexity"], 
+                   mode='lines+markers', name='Semantic', 
+                   line=dict(color='#D55E00'),
+                   marker=dict(color='#D55E00')),
+        row=2, col=2
+    )
+
+    fig_all.update_xaxes(title_text="Número de palabras", row=2, col=1)
+    fig_all.update_xaxes(title_text="Número de palabras", row=2, col=2)
+    fig_all.update_yaxes(title_text="Calificación", row=1, col=1)
+    fig_all.update_yaxes(title_text="Calificación", row=1, col=2)
+    fig_all.update_yaxes(title_text="Complejidad", row=2, col=1)
+    fig_all.update_yaxes(title_text="Complejidad", row=2, col=2)
+
+    fig_all.update_layout(height=700, showlegend=False, template="plotly_white")
+
+    st.plotly_chart(fig_all, use_container_width=True)
+
    
+
+    st.header("Matriz de Correlación")
+    
+    corr_matrix = filtered_df[["content", "wording", "syntactic_complexity", "semantic_complexity", "len_mid"]].corr()
+
+    fig_corr = px.imshow(
+        corr_matrix,
+        text_auto='.2f',
+        aspect="auto",
+        color_continuous_scale=[[0, '#0072B2'], [0.5, '#FFFFFF'], [1, '#D55E00']],
+        labels=dict(color="Correlación"),
+        title="Correlación entre Variables"
+    )
+
+    fig_corr.update_layout(template="plotly_white")
+    st.plotly_chart(fig_corr, use_container_width=True)
+
+    
+    
