@@ -22,11 +22,25 @@ LINE_COLOR = "#F0E442"
 @st.cache_data
 def load_data():
     df = pd.read_csv(DATA_PATH)
-    # Calculamos longitud del texto si no existe
-    if "n_words" not in df.columns:
-        df["n_words"] = df["text"].astype(str).str.split().apply(len)
-    if "n_chars" not in df.columns:
-        df["n_chars"] = df["text"].astype(str).str.len()
+
+    # Detectar columna de texto disponible
+    text_col = None
+    for c in ["clean_text", "text", "summary", "student_summary"]:
+        if c in df.columns:
+            text_col = c
+            break
+
+    if text_col is None:
+        # Evitar crash si no hay texto; crea columnas de longitud vacías
+        df["n_words"] = 0
+        df["n_chars"] = 0
+    else:
+        s = df[text_col].fillna("").astype(str)
+        if "n_words" not in df.columns:
+            df["n_words"] = s.str.split().str.len()
+        if "n_chars" not in df.columns:
+            df["n_chars"] = s.str.len()
+
     return df
 
 
@@ -58,61 +72,52 @@ def render(st):
         df,
         x="n_words",
         y="content",
-        color_discrete_map=PROMPT_COLOR_MAP,
+        color="prompt_title",                       # <-- columna
+        color_discrete_map=PROMPT_COLOR_MAP,       # <-- mapa de colores
+        category_orders={"prompt_title": list(PROMPT_COLOR_MAP.keys())},
         opacity=0.6,
-        labels={
-            "n_words": "Longitud (número de palabras)",
-            "content": "Calificación de Content",
-        },
+        labels={"n_words": "Longitud (número de palabras)", "content": "Calificación de Content"},
         title="Relación entre longitud y calificación de Content",
     )
-
-    # línea de tendencia simple
-    if len(df) > 2:
+    # línea de tendencia
+    if len(df) > 2 and df["n_words"].nunique() > 1:
         coef = np.polyfit(df["n_words"], df["content"], 1)
         x_line = np.linspace(df["n_words"].min(), df["n_words"].max(), 100)
         y_line = coef[0] * x_line + coef[1]
         fig_len.add_trace(
             go.Scatter(
-                x=x_line,
-                y=y_line,
-                mode="lines",
-                name="Tendencia lineal",
+                x=x_line, y=y_line,
+                mode="lines", name="Tendencia lineal",
                 line=dict(color=LINE_COLOR, dash="dash"),
             )
         )
-
     st.plotly_chart(fig_len, use_container_width=True)
+
 
     fig_len2 = px.scatter(
         df,
         x="n_words",
         y="wording",
+        color="prompt_title",
         color_discrete_map=PROMPT_COLOR_MAP,
+        category_orders={"prompt_title": list(PROMPT_COLOR_MAP.keys())},
         opacity=0.6,
-        labels={
-            "n_words": "Longitud (número de palabras)",
-            "wording": "Calificación de Wording",
-        },
+        labels={"n_words": "Longitud (número de palabras)", "wording": "Calificación de Wording"},
         title="Relación entre longitud y calificación de Wording",
     )
-
-    # Agregar tendencia manual
-    if len(df) > 2:
+    if len(df) > 2 and df["n_words"].nunique() > 1:
         coef2 = np.polyfit(df["n_words"], df["wording"], 1)
         x_line2 = np.linspace(df["n_words"].min(), df["n_words"].max(), 100)
         y_line2 = coef2[0] * x_line2 + coef2[1]
         fig_len2.add_trace(
             go.Scatter(
-                x=x_line2,
-                y=y_line2,
-                mode="lines",
-                name="Tendencia lineal",
+                x=x_line2, y=y_line2,
+                mode="lines", name="Tendencia lineal",
                 line=dict(color=LINE_COLOR, dash="dash"),
             )
         )
-
     st.plotly_chart(fig_len2, use_container_width=True)
+
 
     st.divider()
     st.subheader("Correlaciones entre métricas y calificaciones")
@@ -129,8 +134,11 @@ def render(st):
         df,
         x="prompt_title",
         y="n_words",
-        color_discrete_map=PROMPT_COLOR_MAP,
+        color="prompt_title",  # <-- clave: columna que colorea
+        color_discrete_map=PROMPT_COLOR_MAP,  # tu diccionario de colores por prompt
+        category_orders={"prompt_title": list(PROMPT_COLOR_MAP.keys())},  # orden/consistencia
         title="Distribución de longitud de resúmenes por prompt",
         labels={"n_words": "Número de palabras", "prompt_title": "Prompt"},
     )
     st.plotly_chart(fig_box, use_container_width=True)
+
