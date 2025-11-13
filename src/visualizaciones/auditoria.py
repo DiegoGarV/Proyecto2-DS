@@ -8,6 +8,17 @@ import plotly.graph_objects as go
 # Ruta del dataset
 DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "Data_merged.csv"
 
+PROMPT_COLOR_MAP = {
+    "On Tragedy": "#0072B2",
+    "Egyptian Social Structure": "#E69F00",
+    "The Third Wave": "#009E73",
+    "Excerpt from The Jungle": "#D55E00",
+}
+DIST_COLOR_CONTENT = "#56B4E9"
+DIST_COLOR_WORDING = "#CC79A7"
+LINE_COLOR = "#F0E442"
+
+
 @st.cache_data
 def load_data():
     df = pd.read_csv(DATA_PATH)
@@ -18,9 +29,12 @@ def load_data():
         df["n_chars"] = df["text"].astype(str).str.len()
     return df
 
+
 def render(st):
     st.title("Auditoría de Sesgos y Correlaciones")
-    st.caption("Explora relaciones entre longitud, métricas lingüísticas y calificaciones (*content* y *wording*).")
+    st.caption(
+        "Explora relaciones entre longitud, métricas lingüísticas y calificaciones (*content* y *wording*)."
+    )
 
     # Cargar datos
     try:
@@ -41,44 +55,60 @@ def render(st):
 
     # Longitud vs Content/Wording
     fig_len = px.scatter(
-        df, x="n_words", y="content",
-        color="prompt_title",
+        df,
+        x="n_words",
+        y="content",
+        color=PROMPT_COLOR_MAP,
         opacity=0.6,
-        labels={"n_words": "Longitud (número de palabras)", "content": "Calificación de Content"},
-        title="Relación entre longitud y calificación de Content"
+        labels={
+            "n_words": "Longitud (número de palabras)",
+            "content": "Calificación de Content",
+        },
+        title="Relación entre longitud y calificación de Content",
     )
 
     # línea de tendencia simple
     if len(df) > 2:
         coef = np.polyfit(df["n_words"], df["content"], 1)
         x_line = np.linspace(df["n_words"].min(), df["n_words"].max(), 100)
-        y_line = coef[0]*x_line + coef[1]
+        y_line = coef[0] * x_line + coef[1]
         fig_len.add_trace(
             go.Scatter(
-                x=x_line, y=y_line, mode="lines", name="Tendencia lineal",
-                line=dict(color="black", dash="dash")
+                x=x_line,
+                y=y_line,
+                mode="lines",
+                name="Tendencia lineal",
+                line=dict(color=LINE_COLOR, dash="dash"),
             )
         )
 
     st.plotly_chart(fig_len, use_container_width=True)
 
     fig_len2 = px.scatter(
-        df, x="n_words", y="wording",
-        color="prompt_title",
+        df,
+        x="n_words",
+        y="wording",
+        color=PROMPT_COLOR_MAP,
         opacity=0.6,
-        labels={"n_words": "Longitud (número de palabras)", "wording": "Calificación de Wording"},
-        title="Relación entre longitud y calificación de Wording"
+        labels={
+            "n_words": "Longitud (número de palabras)",
+            "wording": "Calificación de Wording",
+        },
+        title="Relación entre longitud y calificación de Wording",
     )
 
     # Agregar tendencia manual
     if len(df) > 2:
         coef2 = np.polyfit(df["n_words"], df["wording"], 1)
         x_line2 = np.linspace(df["n_words"].min(), df["n_words"].max(), 100)
-        y_line2 = coef2[0]*x_line2 + coef2[1]
+        y_line2 = coef2[0] * x_line2 + coef2[1]
         fig_len2.add_trace(
             go.Scatter(
-                x=x_line2, y=y_line2, mode="lines", name="Tendencia lineal",
-                line=dict(color="black", dash="dash")
+                x=x_line2,
+                y=y_line2,
+                mode="lines",
+                name="Tendencia lineal",
+                line=dict(color=LINE_COLOR, dash="dash"),
             )
         )
 
@@ -96,8 +126,11 @@ def render(st):
     st.subheader("Distribución de longitudes por prompt")
 
     fig_box = px.box(
-        df, x="prompt_title", y="n_words", color="prompt_title",
+        df,
+        x="prompt_title",
+        y="n_words",
+        color_discrete_map=PROMPT_COLOR_MAP,
         title="Distribución de longitud de resúmenes por prompt",
-        labels={"n_words": "Número de palabras", "prompt_title": "Prompt"}
+        labels={"n_words": "Número de palabras", "prompt_title": "Prompt"},
     )
     st.plotly_chart(fig_box, use_container_width=True)
